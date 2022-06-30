@@ -3,10 +3,11 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from project.models import Project, Contributor
-from project.serializers import ProjectSerializer, ContributorSerializer
+from project.serializers import ProjectSerializer, ContributorSerializer, IssueSerializer
 from django.shortcuts import get_object_or_404
 from core.models import User
 from .permissions import ProjectPermissions, ContributorPermissions
+from .models import Issue
 
 
 class ProjectList(ListCreateAPIView):
@@ -97,3 +98,49 @@ class ContributorDelete(DestroyAPIView):
             return Response("Author cannot be deleted.", status=status.HTTP_400_BAD_REQUEST)
         contributor.delete()
         return Response("Contributor has been deleted.", status=status.HTTP_204_NO_CONTENT)
+
+
+class IssueList(ListCreateAPIView):
+    def list(self, request, *args, **kwargs):
+        project = get_object_or_404(Project, id=kwargs['pk'])
+        queryset = Issue.objects.filter(project_id=project.id)
+        serializer = IssueSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def create(self, request, *args, **kwargs):
+        project = get_object_or_404(Project, id=kwargs['pk'])
+        data = request.data.copy()
+        data['project_id'] = project.id
+        data['author_user_id'] = request.user.id
+        try:
+            Contributor.objects.get(user_id=data["assignee_user_id"], project_id=project.id)
+            serializer = IssueSerializer(data=data)
+            if serializer.is_valid(raise_exception=True):
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Contributor.DoesNotExist:
+            return Response("This user has not permissions or does not exist", status=status.HTTP_400_BAD_REQUEST)
+
+
+class IssueUpdateDestroy(RetrieveUpdateDestroyAPIView):
+    def update(self, request, *args, **kwargs):
+        project = get_object_or_404(Project, id=kwargs['pk'])
+        issue = get_object_or_404(Issue, id=kwargs['pk_issue'])
+        data = request.data.copy()
+        data['project_id'] = project.id
+        data['author_user_id'] = request.user.id
+        try:
+            Contributor.objects.get(user_id=data["assignee_user_id"], project_id=project.id)
+            serializer = IssueSerializer(issue, data=data)
+            if serializer.is_valid(raise_exception=True):
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Contributor.DoesNotExist:
+            return Response("This user has not permissions or does not exist", status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, *args, **kwargs):
+        issue = get_object_or_404(Issue, id=kwargs['pk_issue'])
+        issue.delete()
+        return Response("Issue successfully deleted", status=status.HTTP_204_NO_CONTENT)
