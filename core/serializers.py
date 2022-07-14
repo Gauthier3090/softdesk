@@ -10,6 +10,8 @@ class UserSerializer(ModelSerializer):
         model = get_user_model()
         fields = ['id', 'first_name', 'last_name', 'email', 'password']
         extra_kwargs = {
+            'first_name': {'required': True},
+            'last_name': {'required': True},
             'password': {'write_only': True}
         }
 
