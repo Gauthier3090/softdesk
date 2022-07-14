@@ -17,8 +17,8 @@ class ProjectList(ListCreateAPIView):
     permission_classes = [IsAuthenticated, ProjectPermissions]
 
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset().filter(author_user_id=request.user.id)
-        serializer = ProjectSerializer(queryset, many=True)
+        contributors = [i.project_id for i in Contributor.objects.filter(user_id=self.request.user)]
+        serializer = ProjectSerializer(contributors, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
